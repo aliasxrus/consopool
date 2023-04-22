@@ -662,7 +662,11 @@ REPEAT
       end
    else if Ord(ThisChar) = 13 then
       begin
-      if Uppercase(Parameter(Command,0)) = 'EXIT' then FinishProgram := true
+      if Uppercase(Parameter(Command,0)) = 'EXIT' then
+         begin
+         if LEngth(ArrayPendingCredit) = 0 then FinishProgram := true
+         else Tolog('.Pool can not be closed now. Wait until pendings are confirmed.')
+         end
       else if Uppercase(Parameter(Command,0)) = 'HELP' then ShowHelp(Uppercase(Parameter(Command,1)))
       else if Uppercase(Parameter(Command,0)) = 'NODES' then ShowNodes
       else if Uppercase(Parameter(Command,0)) = 'RUN' then PrintLine(8,StartPool)

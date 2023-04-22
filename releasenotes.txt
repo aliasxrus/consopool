@@ -1,27 +1,7 @@
-version 0.90
+version 0.91
 
-- New nodes auto update
-- Minstreshold reduced.
-- Multi thread management.
-- Postponed payments to block end.
-- Project jackpot removed.
-- Pool pot implemented.
-- Kill pool implemented.
-
-Version 0.78
-
-- Payments per blockincreased to 50.
-- Array shares increment mode modified.
-- Duplicated ignored.
-
-Version 0.77
-
-- cclasses filter removed.
-- VPNs thread removed.
-- Password enforced.
-- Min payment adjusted to 0.50000000 Noso.
-
-Version 0.76
-
-- Array sources included.
-- Complete beta sources system implemented.
+- Added profitAddress and profitInterval.
+- Shares per block reduced to 1.
+- Double verification on pending payments.
+- Exit intercept when pending on memory.
+- Donation deprecated.

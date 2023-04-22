@@ -268,7 +268,7 @@ Procedure OutputLastDayBlocks();
 
 CONST
   fpcVersion = {$I %FPCVERSION%};
-  AppVersion = 'v0.90';
+  AppVersion = 'v0.91';
   DefHelpLine= 'Type help for available commands';
   DefWorst = 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
   ZipSumaryFilename = 'sumary.zip';
@@ -278,7 +278,7 @@ CONST
   NTPServers        = 'ts2.aco.net:hora.roa.es:time.esa.int:time.stdtime.gov.tw:stratum-1.sjc02.svwh.net:ntp1.sp.se:1.de.pool.ntp.org:';
   VPNsBlocksLife    = 24;
   oneNoso           = 100000000;
-  PoolPot      = 'POOLPOT';
+  PoolPot           = 'POOLPOT';
 
   // Predefined Types for OutPut
   uToBoth      = 0;
@@ -331,6 +331,8 @@ VAR
   PoolDonate   : integer = 5;
   AMIPass      : string = 'default';
   KillPool     : boolean = false;
+  ProfitAddress: string = '';
+  ProfitInterval : integer = 100;
   // Operative
   MinTreshold  : int64 = 40000000;
   previousNodes: string;
@@ -358,9 +360,11 @@ VAR
   RejectedShares   : integer = 0;
   RestartAfterQuit : boolean = false;
   FileToRestart    : string = '';
-  MaxSharesPerBlock: integer = 2;
+  MaxSharesPerBlock: integer = 1;
   MaxPaysPerBlock  : integer = 50;
   BannedAddresses  : string = '';
+  Global_PendingToCredit : int64 = 0;
+  Global_PoolProfit      : int64 = 0;
   // Mainnet
   LastConsensusTry : int64   = 0;
   WaitingConsensus :Boolean = false;
@@ -502,8 +506,15 @@ Begin
 Repeat
    sleep(5);
 until ActivePaysCount <2;
-IncActivePays();
-Balance := GetMinerBalance(address);
+if Address = ProfitAddress then
+   begin
+   Balance := (GLOBAL_PoolProfit*95) div 100;
+   end
+else
+   begin
+   Balance := GetMinerBalance(address);
+   IncActivePays();
+   end;
 Fee     := GetFee(Balance);
 ToSend  := Balance - Fee;
 if ToSend<=0 then
@@ -542,6 +553,8 @@ if Copy(Resultado,1,2) ='OR' then
    AddPaymentToFile((GetMainConsensus.block+1).ToString,Address,Balance.ToString,Resultado);
    WasGood := true;
    DecreasePayThreads(True,Balance, Address);
+   if Address = ProfitAddress then
+      ToLog(Format('/Profit payment done: %s',[Int2curr(ToSend)]));
    end
 else if Resultado <> '' then
    begin
@@ -574,7 +587,7 @@ else if resultado = '' then // Empty response from node
    ToLog(' Payment empty response error: '+OrdHash);
    DecreasePayThreads(False,Balance);
    end;
-DecActivePays();
+if Address <> ProfitAddress then DecActivePays();
 End;
 
 Procedure AddPaymentToFile(Block,destino,monto,OrderID:String);
@@ -1005,18 +1018,28 @@ End;
 Procedure ProcessPEndingCredits();
 var
   counter : integer;
-  TotalPAid : int64 = 0;
+  LTotalPAid : int64 = 0;
   ToJackpot : int64 = 0;
   Processed : int64;
+  ProcessCount : integer = 0;
   Ignored   : int64 = 0;
+  IgnoCount : integer = 0;
 Begin
 for counter := 0 to length(ArrayPendingCredit)-1 do
    begin
    if Not AnsiContainsStr(BannedAddresses,ArrayPendingCredit[counter].address) then
       begin
       Processed := ConfirmPending(ArrayPendingCredit[counter].address,ArrayPendingCredit[counter].Balance);
-      if Processed > 0 then Inc(TotalPAid,Processed)
-      else Inc (Ignored,Processed);
+      if Processed > 0 then
+         begin
+         Inc(LTotalPAid,Processed);
+         Inc(ProcessCount);
+         end
+      else
+         begin
+         Inc (Ignored,ArrayPendingCredit[counter].Balance);
+         Inc(IgnoCount);
+         end;
       end
    else
       begin
@@ -1024,9 +1047,11 @@ for counter := 0 to length(ArrayPendingCredit)-1 do
       Inc(ToJackpot,ArrayPendingCredit[counter].Balance);
       end;
    end;
+Global_PendingToCredit := 0;
 SetLEngth(ArrayPendingCredit,0);
+AddPoolPotBalance(Ignored);
 AddPoolPotBalance(ToJackpot);
-ToLog(Format(' Confirmed credited : %s [ %s ] [ %s ]',[Int2curr(TotalPAid),int2curr(ToJackpot),int2curr(Ignored)]));
+ToLog(Format(' Confirmed credited : %s [ %s ] [ %s ]',[Int2curr(LTotalPAid),int2curr(ToJackpot),int2curr(Ignored)]));
 ToLog(Format(' Total debt : %s ',[Int2curr(GetTotalDebt)]));
 SaveMiners;
 End;
@@ -1552,6 +1577,8 @@ writeln(configfile,'autovalue '+IntToStr(AutoValue));
 writeln(configfile,'donate '+PoolDonate.ToString);
 writeln(configfile,'amipass '+AMIPass);
 writeln(configfile,'killpool '+BoolToStr(killpool,True));
+writeln(configfile,'profitaddress '+ProfitAddress);
+writeln(configfile,'profitinterval '+IntToStr(ProfitInterval));
 
 CloseFile(configfile);
 EXCEPT ON E:EXCEPTION do
@@ -1592,6 +1619,8 @@ while not eof(configfile) do
    if uppercase(Parameter(linea,0)) = 'DONATE' then PoolDonate := StrToIntDef(Parameter(linea,1),PoolDonate);
    if uppercase(Parameter(linea,0)) = 'AMIPASS' then AMIPass := Parameter(linea,1);
    if uppercase(Parameter(linea,0)) = 'KILLPOOL' then KillPool := StrToBool(Parameter(linea,1));
+   if uppercase(Parameter(linea,0)) = 'PROFITADDRESS' then ProfitAddress := Parameter(linea,1);
+   if uppercase(Parameter(linea,0)) = 'PROFITINTERVAL' then ProfitInterval := StrToIntDef(Parameter(linea,1),ProfitInterval);
    if PoolDonate>99 then PoolDonate := 99;
    end;
 EXCEPT ON E:EXCEPTION do
@@ -1825,9 +1854,9 @@ Result := '';
 BaseReward := GetMainConsensus.LBPoW;
 ToDistribute := BaseReward;
 Comision := (ToDistribute * PoolFee) div 10000;
-ToDistribute := ToDistribute - Comision;
+BaseReward := ToDistribute - Comision;
 FromPot := GetPoolPotBalance;
-ToDistribute := ToDistribute + fromPot;
+ToDistribute := BaseReward + fromPot;
 EnterCriticalSection(CS_Miners);
 Setlength(ArrayPendingCredit,0);
 Setlength(ArrayPendingCredit,1);
@@ -1848,17 +1877,19 @@ For counter := 0 to length(ArrMinersNew)-1 do
       end;
    end;
 LeaveCriticalSection(CS_Miners);
-ToLog(Format(' Total pending: %s [Pot: %s]',[int2curr(TotalPending),int2curr(frompot)]));
+Global_PendingToCredit := TotalPending;
+ToLog(Format(' Total pending: %s [%s + %s]',[int2curr(TotalPending),int2curr(BaseReward),int2curr(FromPot)]));
 SetPoolPotBalance(0);
-Earned := GetMainConsensus.LBPoW-(PerShare*TotalShares);
+Earned :=ToDistribute-(PerShare*TotalShares);
+ToLog(Format(' Earned : %s ',[Int2curr(Earned)]));
 if PoolDonate>0 then
    begin
+   {
    DonationAmount := (Earned*PoolDonate) div 100;
    CreditDonationToDeveloper(DonationAmount);
+   }
    end;
 Result := PerShare.ToString+' '+Earned.ToString+' '+TotalShares.ToString+' '+DonationAmount.ToString;
-if (PerShare*TotalShares)+Earned <> BaseReward then
-   ToLog(Format(' Error on distribution: %d',[BaseReward-(PerShare*TotalShares)]));
 End;
 
 Procedure RunPayments();
@@ -1871,7 +1902,7 @@ var
   TotalToPay      : int64 = 0;
   AddressList     : string = '';
   ThisBlockPays   : integer = 0;
-  ToProject       : int64;
+  ToProject       : int64 = 0;
   TotalProject    : int64 = 0;
 Begin
 ClearActivePays();
@@ -1966,6 +1997,9 @@ var
   BalanceTotal : int64 = 0;
   SharesTotal  : int64 = 0;
   AddText,BalanText, sharestext, ToPayText : string;
+  PoolProfit : int64 = 0;
+  PoolDebt   : int64 = 0;
+  ThisThread : ThreadPayment;
 Begin
 SetLength(CopyArray,0);
 SetLength(finalArray,0);
@@ -2008,7 +2042,18 @@ if Destination = uToFile then
       writeln(ReportFile,format('%s %s %s',[AddText,BalanText,sharestext]));
       end;
    CloseFile(ReportFile);
-   ToLog(format('/Report file Generated Block %d [ %s ]',[GetMainConsensus.block,Int2Curr(GetAddressBalanceFromSumary(PoolAddress)-BalanceTotal-TotalPaid)]));
+   PoolDebt := (BalanceTotal + Global_PendingToCredit);
+   PoolProfit := GetAddressBalanceFromSumary(PoolAddress)-TotalPAid-PoolDebt;
+   if ( (GetMainConsensus.block mod ProfitInterval = 0) and
+        (IsValidHashAddress(ProfitAddress)) and
+        (PoolProfit > onenoso) ) then
+      begin
+      Global_PoolProfit := PoolProfit;
+      ThisThread := ThreadPayment.create(true,ProfitAddress);
+      ThisThread.FreeOnTerminate:=true;
+      ThisThread.Start;
+      end;
+   ToLog(format('/Report file Generated Block %d [Pool profit: %s ]',[GetMainConsensus.block,Int2Curr(PoolProfit)]));
    end
 else if Destination = uToConsole then
    Begin
