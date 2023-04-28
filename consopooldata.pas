@@ -191,6 +191,7 @@ Procedure DecreasePayThreads(WasGood:boolean;Amount:int64;Address:String='');
 // Pool Balance
 Procedure SetPoolBalance(ThisValue:int64);
 Function GetPoolBalance():Int64;
+Procedure IncreasePoolPot(amount:string);
 // LastBlockRate
 Procedure SetLastBlockRate(ThisValue:int64);
 Function GetLastBlockRate():Int64;
@@ -268,7 +269,7 @@ Procedure OutputLastDayBlocks();
 
 CONST
   fpcVersion = {$I %FPCVERSION%};
-  AppVersion = 'v0.91';
+  AppVersion = 'v0.92';
   DefHelpLine= 'Type help for available commands';
   DefWorst = 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
   ZipSumaryFilename = 'sumary.zip';
@@ -2656,6 +2657,20 @@ Begin
 EnterCriticalSection(CS_PoolBalance);
 Result := PoolBalance;
 LeaveCriticalSection(CS_PoolBalance);
+End;
+
+Procedure IncreasePoolPot(amount:string);
+var
+  IntAmount : int64;
+Begin
+IntAmount := StrToInt64def(amount,0);
+if IntAmount > 0 then
+   begin
+   IntAmount := IntAmount * onenoso;
+   AddPoolPotBalance(IntAmount);
+   ToLog('.Added to pool pool: '+Int2curr(Intamount));
+   SaveMiners();
+   end;
 End;
 
 {$ENDREGION}

@@ -672,6 +672,8 @@ REPEAT
       else if Uppercase(Parameter(Command,0)) = 'RUN' then PrintLine(8,StartPool)
       else if Uppercase(Parameter(Command,0)) = 'STOP' then PrintLine(8,StopPool)
       else if Uppercase(Parameter(Command,0)) = 'SHARES' then ShowBlockShares
+      else if Uppercase(Parameter(Command,0)) = 'TOPOOLPOT' then IncreasePoolPot(Parameter(Command,1))
+      else if Uppercase(Parameter(Command,0)) = 'POOLPOT' then Tolog('.Pool pot: '+Int2Curr(GetPoolPotBalance))
       else if Uppercase(Parameter(Command,0)) = 'SOURCES' then
          begin
          OutputSourcesToFile(GetMainConsensus.LBMiner = PoolAddress);

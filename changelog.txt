@@ -1,3 +1,11 @@
+version 0.91
+
+- Added profitAddress and profitInterval.
+- Shares per block reduced to 1.
+- Double verification on pending payments.
+- Exit intercept when pending on memory.
+- Donation deprecated.
+
 version 0.90
 
 - New nodes auto update

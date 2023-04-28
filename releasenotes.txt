@@ -1,7 +1,3 @@
-version 0.91
+version 0.92
 
-- Added profitAddress and profitInterval.
-- Shares per block reduced to 1.
-- Double verification on pending payments.
-- Exit intercept when pending on memory.
-- Donation deprecated.
+- Pool pot commands added.
