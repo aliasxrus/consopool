@@ -1404,7 +1404,7 @@ if VPNIPExists(IPUser) then
    Result := -1;
    exit;
    end;
-if ShareAlreadyExists(Share) then
+if ShareAlreadyExists(Share+Address) then
    begin
    ToLog(Format(' Error 4 [%s] [%s]',[MinerProgram,IPUser]),uToFile);
    result := 4;
